@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Alpha Pro</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --bg: #F2F2F7; --card: #FFFFFF; --blue: #007AFF; --green: #34C759; --gray: #8E8E93; --separator: #C6C6C8; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        header { padding: 14px 20px; background: #fff; border-bottom: 0.5px solid var(--separator); display: flex; justify-content: space-between; align-items: center; }
+        h1 { font-size: 24px; margin: 0; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px; }
+        .table-card { background: var(--card); border-radius: 16px; height: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer; }
+        .table-card.done { border: 2px solid var(--green); background: #F0FFF4; }
+        .t-num { font-size: 26px; font-weight: 700; color: var(--blue); }
+        .done .t-num { color: var(--green); }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); display: none; flex-direction: column; z-index: 100; }
+        .modal.active { display: flex; }
+        .modal-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 0.5px solid var(--separator); }
+        .list { flex: 1; padding: 20px; overflow-y: auto; }
+        .guest-item { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .btn { padding: 12px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; }
+        .btn-blue { background: var(--blue); color: #fff; margin: 20px; }
+        .btn-text { background: none; color: var(--blue); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Alpha Pro</h1>
+        <div id="dateNow" style="color: var(--gray);"></div>
+    </header>
+
+    <div class="grid" id="grid"></div>
+
+    <div id="modal" class="modal">
+        <div class="modal-header">
+            <button class="btn-text" onclick="closeModal()">Назад</button>
+            <h2 id="modalTitle">Стол</h2>
+            <div style="width: 50px;"></div>
+        </div>
+        <div class="list" id="guestList"></div>
+        <button class="btn-text" onclick="addGuest()">+ Добавить гостя</button>
+        <button class="btn btn-blue" onclick="save()">Сохранить</button>
+    </div>
+
+    <script>
+        const URL = 'https://ywojjqpbqwbudezdoezl.supabase.co';
+        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3b2pqcXBicXdidWRlemRvZXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1OTI1MTgsImV4cCI6MjA4NDE2ODUxOH0.WYGl9YFjULylb46aTek5Ee8qf0ENovYZB-wd9g0h8Xs';
+        const supabase = window.supabase.createClient(URL, KEY);
+
+        let currentTable = null;
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateNow').innerText = today;
+
+        async function loadGrid() {
+            const { data } = await supabase.from('attendance').select('table_number').eq('check_date', today).eq('is_present', true);
+            const active = new Set(data?.map(r => r.table_number));
+            
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= 12; i++) {
+                const div = document.createElement('div');
+                div.className = `table-card ${active.has(i) ? 'done' : ''}`;
+                div.innerHTML = `<span class="t-num">${i}</span><span style="color:gray;font-size:12px;">Стол</span>`;
+                div.onclick = () => openTable(i);
+                grid.appendChild(div);
+            }
+        }
+
+        async function openTable(num) {
+            currentTable = num;
+            document.getElementById('modalTitle').innerText = `Стол №${num}`;
+            document.getElementById('modal').classList.add('active');
+            renderGuests();
+        }
+
+        async function renderGuests() {
+            const list = document.getElementById('guestList');
+            list.innerHTML = 'Загрузка...';
+            const { data: guests } = await supabase.from('guests').select('*').eq('table_number', currentTable);
+            const { data: att } = await supabase.from('attendance').select('guest_id').eq('table_number', currentTable).eq('check_date', today);
+            
+            const presentIds = new Set(att?.map(a => a.guest_id));
+            list.innerHTML = '';
+            
+            if (!guests.length) list.innerHTML = '<center>Гостей нет</center>';
+
+            guests.forEach(g => {
+                const item = document.createElement('div');
+                item.className = 'guest-item';
+                const isChecked = presentIds.has(g.id);
+                item.innerHTML = `
+                    <span>${g.full_name}</span>
+                    <input type="checkbox" style="width:25px;height:25px;" data-id="${g.id}" ${isChecked ? 'checked' : ''}>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function addGuest() {
+            const name = prompt("Имя гостя:");
+            if (!name) return;
+            await supabase.from('guests').insert({ full_name: name, table_number: currentTable });
+            renderGuests();
+        }
+
+        async function save() {
+            const checks = document.querySelectorAll('input[type="checkbox"]');
+            const results = Array.from(checks).map(c => ({
+                guest_id: c.dataset.id,
+                table_number: currentTable,
+                check_date: today,
+                is_present: c.checked
+            }));
+
+            await supabase.from('attendance').delete().eq('table_number', currentTable).eq('check_date', today);
+            if (results.length > 0) await supabase.from('attendance').insert(results);
+            
+            closeModal();
+            loadGrid();
+        }
+
+        function closeModal() { document.getElementById('modal').classList.remove('active'); }
+
+        loadGrid();
+    </script>
+</body>
+</html>
