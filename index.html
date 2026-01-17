@@ -3,128 +3,317 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Alpha Pro</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <title>Alpha Offline Pro</title>
     <style>
-        :root { --bg: #F2F2F7; --card: #FFFFFF; --blue: #007AFF; --green: #34C759; --gray: #8E8E93; --separator: #C6C6C8; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        header { padding: 14px 20px; background: #fff; border-bottom: 0.5px solid var(--separator); display: flex; justify-content: space-between; align-items: center; }
-        h1 { font-size: 24px; margin: 0; }
+        :root {
+            --bg: #F2F2F7;
+            --card: #FFFFFF;
+            --blue: #007AFF;
+            --green: #34C759;
+            --red: #FF3B30;
+            --gray: #8E8E93;
+            --separator: #C6C6C8;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+            background-color: var(--bg);
+            margin: 0; padding: 0;
+            color: #000;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        .modal-view {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--bg);
+            z-index: 100;
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            display: flex; flex-direction: column;
+        }
+        .modal-view.active { transform: translateY(0); }
+
+        header {
+            padding: 14px 20px;
+            background: rgba(242, 242, 247, 0.95);
+            backdrop-filter: blur(15px);
+            position: sticky; top: 0; z-index: 50;
+            border-bottom: 0.5px solid rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+            height: 44px;
+        }
+        h1 { font-size: 28px; font-weight: 800; margin: 0; }
+        h2 { font-size: 17px; font-weight: 600; margin: 0; }
+
+        .date-btn {
+            background: rgba(118, 118, 128, 0.12);
+            color: var(--blue); font-weight: 500;
+            padding: 6px 12px; border-radius: 8px; font-size: 15px; border: none;
+            position: relative;
+        }
+        .date-input-hidden {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0; cursor: pointer;
+        }
+
         .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px; }
-        .table-card { background: var(--card); border-radius: 16px; height: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer; }
-        .table-card.done { border: 2px solid var(--green); background: #F0FFF4; }
+        .table-card {
+            background: var(--card); border-radius: 16px; height: 90px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            position: relative; transition: all 0.1s;
+        }
+        .table-card:active { transform: scale(0.95); background: #E5E5EA; }
+        .table-card.done { border: 2.5px solid var(--green); background: #F0FFF4; }
         .t-num { font-size: 26px; font-weight: 700; color: var(--blue); }
         .done .t-num { color: var(--green); }
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); display: none; flex-direction: column; z-index: 100; }
-        .modal.active { display: flex; }
-        .modal-header { padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 0.5px solid var(--separator); }
-        .list { flex: 1; padding: 20px; overflow-y: auto; }
-        .guest-item { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .btn { padding: 12px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; }
-        .btn-blue { background: var(--blue); color: #fff; margin: 20px; }
-        .btn-text { background: none; color: var(--blue); }
+        .t-lbl { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+        .list-wrap { padding: 20px; flex: 1; overflow-y: auto; padding-bottom: 120px; }
+        .ios-list { background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .guest-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 16px; border-bottom: 0.5px solid var(--separator);
+        }
+        .guest-row:last-child { border-bottom: none; }
+        .g-name { font-size: 17px; font-weight: 400; }
+
+        .switch { position: relative; display: inline-block; width: 51px; height: 31px; flex-shrink: 0;}
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #E9E9EA; transition: .3s; border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 27px; width: 27px; left: 2px; bottom: 2px;
+            background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input:checked + .slider { background-color: var(--green); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .fab-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(255,255,255,0.9); backdrop-filter: blur(20px);
+            padding: 12px 20px 35px; border-top: 0.5px solid rgba(0,0,0,0.1);
+            display: flex; gap: 12px; z-index: 101;
+        }
+        .btn { flex: 1; padding: 14px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; }
+        .btn-main { background: var(--blue); color: white; }
+        .btn-sec { background: #E5E5EA; color: var(--blue); }
+        .text-btn { background: none; border: none; color: var(--blue); font-size: 17px; cursor: pointer; }
+        
+        .stats-detail { display: none; background: #F8F8F8; padding: 12px 16px; font-size: 14px; border-bottom: 0.5px solid var(--separator); }
+        .stats-detail.open { display: block; }
+        .count-badge { background: #E5E5EA; color: #000; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Alpha Pro</h1>
-        <div id="dateNow" style="color: var(--gray);"></div>
-    </header>
-
-    <div class="grid" id="grid"></div>
-
-    <div id="modal" class="modal">
-        <div class="modal-header">
-            <button class="btn-text" onclick="closeModal()">Назад</button>
-            <h2 id="modalTitle">Стол</h2>
-            <div style="width: 50px;"></div>
+    <div class="view-home">
+        <header>
+            <h1>Alpha</h1>
+            <div class="date-btn">
+                <span id="dateBtnLabel">Сегодня</span>
+                <input type="date" id="datePicker" class="date-input-hidden" onchange="changeDate(this.value)">
+            </div>
+        </header>
+        <div class="grid" id="tablesGrid"></div>
+        <div style="padding: 0 20px;">
+            <button onclick="openStats()" class="btn btn-sec" style="width: 100%;">История и Статистика</button>
         </div>
-        <div class="list" id="guestList"></div>
-        <button class="btn-text" onclick="addGuest()">+ Добавить гостя</button>
-        <button class="btn btn-blue" onclick="save()">Сохранить</button>
+    </div>
+
+    <div id="modal-table" class="modal-view">
+        <header>
+            <button onclick="closeModal('modal-table')" class="text-btn">Назад</button>
+            <h2 id="tableTitle">Стол</h2>
+            <button onclick="toggleEditMode()" class="text-btn" id="editBtn">Изм.</button>
+        </header>
+        <div class="list-wrap">
+            <div class="ios-list" id="guestListContainer"></div>
+            <button class="text-btn" style="padding: 16px; width:100%; text-align:left;" onclick="addNewGuest()">+ Добавить гостя</button>
+        </div>
+        <div class="fab-bar">
+            <button class="btn btn-main" onclick="saveAttendance()" id="saveBtn">Сохранить</button>
+        </div>
+    </div>
+
+    <div id="modal-stats" class="modal-view">
+        <header>
+            <button onclick="closeModal('modal-stats')" class="text-btn">Закрыть</button>
+            <h2>Статистика</h2>
+            <div style="width:50px"></div>
+        </header>
+        <div class="list-wrap" id="statsContent"></div>
+        <div style="padding: 20px; text-align: center;">
+            <button onclick="clearAllData()" style="color: var(--red); background: none; border: none; font-size: 13px;">Сбросить все данные</button>
+        </div>
     </div>
 
     <script>
-        const URL = 'https://ywojjqpbqwbudezdoezl.supabase.co';
-        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3b2pqcXBicXdidWRlemRvZXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1OTI1MTgsImV4cCI6MjA4NDE2ODUxOH0.WYGl9YFjULylb46aTek5Ee8qf0ENovYZB-wd9g0h8Xs';
-        const supabase = window.supabase.createClient(URL, KEY);
+        const getGuests = () => JSON.parse(localStorage.getItem('alpha_guests') || '[]');
+        const setGuests = (val) => localStorage.setItem('alpha_guests', JSON.stringify(val));
+        const getAtt = () => JSON.parse(localStorage.getItem('alpha_attendance') || '[]');
+        const setAtt = (val) => localStorage.setItem('alpha_attendance', JSON.stringify(val));
 
         let currentTable = null;
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dateNow').innerText = today;
+        let activeDate = new Date().toISOString().split('T')[0];
+        let isEditMode = false;
 
-        async function loadGrid() {
-            const { data } = await supabase.from('attendance').select('table_number').eq('check_date', today).eq('is_present', true);
-            const active = new Set(data?.map(r => r.table_number));
+        function updateDateLabel() {
+            const label = document.getElementById('dateBtnLabel');
+            const today = new Date().toISOString().split('T')[0];
+            const parts = activeDate.split('-');
+            label.innerText = (activeDate === today) ? "Сегодня" : `${parts[2]}.${parts[1]}`;
+            label.style.color = (activeDate === today) ? "var(--blue)" : "var(--red)";
+        }
+
+        function loadGridStatuses() {
+            const grid = document.getElementById('tablesGrid');
+            const att = getAtt();
+            const activeTables = new Set(att.filter(r => r.date === activeDate && r.isPresent).map(r => r.tableId));
             
-            const grid = document.getElementById('grid');
             grid.innerHTML = '';
             for (let i = 1; i <= 12; i++) {
-                const div = document.createElement('div');
-                div.className = `table-card ${active.has(i) ? 'done' : ''}`;
-                div.innerHTML = `<span class="t-num">${i}</span><span style="color:gray;font-size:12px;">Стол</span>`;
-                div.onclick = () => openTable(i);
-                grid.appendChild(div);
+                const btn = document.createElement('button');
+                btn.className = `table-card ${activeTables.has(i) ? 'done' : ''}`;
+                btn.innerHTML = `<span class="t-num">${i}</span><span class="t-lbl">Стол</span>`;
+                btn.onclick = () => openTable(i);
+                grid.appendChild(btn);
             }
         }
 
-        async function openTable(num) {
-            currentTable = num;
-            document.getElementById('modalTitle').innerText = `Стол №${num}`;
-            document.getElementById('modal').classList.add('active');
-            renderGuests();
+        function changeDate(val) {
+            if(!val) return;
+            activeDate = val;
+            updateDateLabel();
+            loadGridStatuses();
         }
 
-        async function renderGuests() {
-            const list = document.getElementById('guestList');
-            list.innerHTML = 'Загрузка...';
-            const { data: guests } = await supabase.from('guests').select('*').eq('table_number', currentTable);
-            const { data: att } = await supabase.from('attendance').select('guest_id').eq('table_number', currentTable).eq('check_date', today);
-            
-            const presentIds = new Set(att?.map(a => a.guest_id));
-            list.innerHTML = '';
-            
-            if (!guests.length) list.innerHTML = '<center>Гостей нет</center>';
+        function openTable(num) {
+            currentTable = num;
+            isEditMode = false;
+            document.getElementById('editBtn').innerText = "Изм.";
+            document.getElementById('tableTitle').innerText = `Стол №${num}`;
+            document.getElementById('modal-table').classList.add('active');
+            renderGuestList();
+        }
 
-            guests.forEach(g => {
-                const item = document.createElement('div');
-                item.className = 'guest-item';
-                const isChecked = presentIds.has(g.id);
-                item.innerHTML = `
-                    <span>${g.full_name}</span>
-                    <input type="checkbox" style="width:25px;height:25px;" data-id="${g.id}" ${isChecked ? 'checked' : ''}>
-                `;
-                list.appendChild(item);
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            if(id === 'modal-table') loadGridStatuses();
+        }
+
+        function renderGuestList() {
+            const container = document.getElementById('guestListContainer');
+            const guests = getGuests().filter(g => g.tableId === currentTable).sort((a,b) => a.name.localeCompare(b.name));
+            const att = getAtt();
+
+            container.innerHTML = '';
+            if (guests.length === 0) {
+                container.innerHTML = '<div style="padding:20px; text-align:center; color:#999">Список пуст</div>';
+                return;
+            }
+
+            guests.forEach(guest => {
+                const record = att.find(r => r.guestId === guest.id && r.date === activeDate);
+                const isChecked = record ? record.isPresent : true;
+
+                const div = document.createElement('div');
+                div.className = 'guest-row';
+                if (isEditMode) {
+                    div.innerHTML = `<span class="g-name">${guest.name}</span><button class="text-btn" style="color:var(--red); font-size:14px;" onclick="deleteGuest(${guest.id})">Удалить</button>`;
+                } else {
+                    div.innerHTML = `<span class="g-name">${guest.name}</span><label class="switch"><input type="checkbox" ${isChecked ? 'checked' : ''} data-id="${guest.id}"><span class="slider"></span></label>`;
+                }
+                container.appendChild(div);
             });
         }
 
-        async function addGuest() {
-            const name = prompt("Имя гостя:");
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            document.getElementById('editBtn').innerText = isEditMode ? "Готово" : "Изм.";
+            renderGuestList();
+        }
+
+        function addNewGuest() {
+            const name = prompt("ФИО гостя:");
             if (!name) return;
-            await supabase.from('guests').insert({ full_name: name, table_number: currentTable });
-            renderGuests();
+            const guests = getGuests();
+            guests.push({ id: Date.now(), name, tableId: currentTable });
+            setGuests(guests);
+            renderGuestList();
         }
 
-        async function save() {
-            const checks = document.querySelectorAll('input[type="checkbox"]');
-            const results = Array.from(checks).map(c => ({
-                guest_id: c.dataset.id,
-                table_number: currentTable,
-                check_date: today,
-                is_present: c.checked
-            }));
-
-            await supabase.from('attendance').delete().eq('table_number', currentTable).eq('check_date', today);
-            if (results.length > 0) await supabase.from('attendance').insert(results);
-            
-            closeModal();
-            loadGrid();
+        function deleteGuest(id) {
+            if (!confirm("Удалить гостя?")) return;
+            let guests = getGuests();
+            guests = guests.filter(g => g.id !== id);
+            setGuests(guests);
+            renderGuestList();
         }
 
-        function closeModal() { document.getElementById('modal').classList.remove('active'); }
+        function saveAttendance() {
+            const btn = document.getElementById('saveBtn');
+            const inputs = document.querySelectorAll('#guestListContainer input[type="checkbox"]');
+            let att = getAtt();
 
-        loadGrid();
+            att = att.filter(r => !(r.date === activeDate && r.tableId === currentTable));
+
+            inputs.forEach(i => {
+                att.push({
+                    date: activeDate,
+                    guestId: parseInt(i.dataset.id),
+                    isPresent: i.checked,
+                    tableId: currentTable
+                });
+            });
+
+            setAtt(att);
+            btn.innerText = "Готово!";
+            setTimeout(() => { closeModal('modal-table'); btn.innerText = "Сохранить"; }, 600);
+        }
+
+        function openStats() {
+            document.getElementById('modal-stats').classList.add('active');
+            const container = document.getElementById('statsContent');
+            const att = getAtt().filter(r => r.isPresent);
+            const dates = [...new Set(att.map(r => r.date))].sort().reverse();
+
+            container.innerHTML = '<div class="ios-list">';
+            if (dates.length === 0) container.innerHTML = '<div style="padding:40px; text-align:center; color:#999">Нет данных</div>';
+
+            dates.forEach((d, idx) => {
+                const dayLog = att.filter(r => r.date === d);
+                const byTable = {};
+                dayLog.forEach(r => byT[r.tableId] = (byT[r.tableId] || 0) + 1);
+                
+                let details = '';
+                for(let t=1; t<=12; t++) {
+                    const count = dayLog.filter(r => r.tableId === t).length;
+                    if(count > 0) details += `Стол ${t}: <b>${count}</b> чел.<br>`;
+                }
+
+                container.querySelector('.ios-list').innerHTML += `
+                    <div class="guest-row" onclick="document.getElementById('st-${idx}').classList.toggle('open')">
+                        <span>${d.split('-').reverse().join('.')}</span><span class="count-badge">${dayLog.length}</span>
+                    </div>
+                    <div id="st-${idx}" class="stats-detail">${details}</div>
+                `;
+            });
+            container.innerHTML += '</div>';
+        }
+
+        function clearAllData() {
+            if(confirm("ВНИМАНИЕ! Это удалит ВСЕ данные. Продолжить?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        updateDateLabel();
+        loadGridStatuses();
     </script>
 </body>
 </html>
